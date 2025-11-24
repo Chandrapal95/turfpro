@@ -4,7 +4,7 @@ import { Booking, User, PricingConfig } from '../types';
 // CONFIGURATION
 // ------------------------------------------------------------------
 // TODO: PASTE YOUR DEPLOYED GOOGLE APPS SCRIPT WEB APP URL BELOW
-const GOOGLE_SCRIPT_URL: string = 'PASTE_YOUR_GOOGLE_SCRIPT_WEB_APP_URL_HERE'; 
+export const GOOGLE_SCRIPT_URL: string = 'PASTE_YOUR_GOOGLE_SCRIPT_WEB_APP_URL_HERE'; 
 
 // Formspree URL for Backup Emails
 export const FORMSPREE_URL = "https://formspree.io/f/movbprqy";

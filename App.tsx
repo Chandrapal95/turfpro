@@ -4,8 +4,9 @@ import { Navigation } from './components/Navigation';
 import { BookingSystem } from './components/BookingSystem';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ViewState, User } from './types';
-import { MapPin, Phone, Mail, Star, Quote, ArrowRight, Instagram, Facebook, Twitter, Send, Check, ShieldCheck, Zap, Trophy } from 'lucide-react';
+import { MapPin, Phone, Mail, Star, Quote, ArrowRight, Instagram, Facebook, Twitter, Send, Check, ShieldCheck, Zap, Trophy, AlertTriangle } from 'lucide-react';
 import { getReviews, getCurrentUser, loginUser, logoutUser } from './services/storageService';
+import { GOOGLE_SCRIPT_URL } from './services/api';
 
 interface ContactFormData {
     name: string;
@@ -17,6 +18,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.HOME);
   const [user, setUser] = useState<User | null>(null);
   const [reviews, setReviews] = useState(getReviews());
+  const [isConfigured, setIsConfigured] = useState(true);
   
   // Login State
   const [loginEmail, setLoginEmail] = useState('');
@@ -31,6 +33,11 @@ const App: React.FC = () => {
   useEffect(() => {
       const currentUser = getCurrentUser();
       setUser(currentUser);
+      
+      // Check if backend URL is configured
+      if (GOOGLE_SCRIPT_URL.includes('PASTE_YOUR') || GOOGLE_SCRIPT_URL === '') {
+          setIsConfigured(false);
+      }
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -511,7 +518,13 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white relative">
+      {!isConfigured && (
+          <div className="bg-yellow-500 text-white text-center py-2 px-4 font-bold sticky top-0 z-[100] shadow-md flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 mr-2" />
+              SETUP REQUIRED: Please configure the Google Apps Script URL in services/api.ts
+          </div>
+      )}
       <Navigation 
         currentView={currentView} 
         onChangeView={setCurrentView} 
