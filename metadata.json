@@ -1,0 +1,7 @@
+{
+  "name": "TurfPro - Premium Cricket Booking",
+  "description": "A modern, full-featured booking system for cricket turfs with admin dashboard, real-time scheduling, and AI-powered insights.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
