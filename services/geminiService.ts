@@ -3,7 +3,7 @@ import { Booking } from "../types";
 
 // Initialize Gemini Client
 // Using process.env.API_KEY as required by the guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Using the correct model for text tasks
 const MODEL_NAME = 'gemini-2.5-flash';

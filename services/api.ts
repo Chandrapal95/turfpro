@@ -33,7 +33,7 @@ export async function getDayData(date: string) {
     try {
         const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getAvailability&date=${date}`);
         const data = await response.json();
-        return data; // { booked: [], blocked: [], pricing: {} }
+        return data; // { booked: [], blocked: [], pricing: { basePrice, peakPrice, upiId, etc } }
     } catch (error) {
         console.error("Failed to fetch from Google Sheet:", error);
         return { booked: [], blocked: [], pricing: {} };
@@ -93,14 +93,14 @@ export async function rejectBooking(bookingId: string) {
  */
 export async function getAdminData() {
     if (GOOGLE_SCRIPT_URL.includes('PASTE_YOUR') || GOOGLE_SCRIPT_URL === '') {
-        return { bookings: [], blocked: [] };
+        return { bookings: [], blocked: [], config: { basePrice: 800, peakPrice: 1200, upiId: 'mock@upi', peakStartHour: 18 } };
     }
 
     try {
         const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getAllData`);
         return await response.json();
     } catch (error) {
-        return { bookings: [], blocked: [] };
+        return { bookings: [], blocked: [], config: {} };
     }
 }
 
@@ -117,9 +117,9 @@ export async function toggleBlockSlot(date: string, slotId: string) {
 }
 
 /**
- * Update Pricing
+ * Update Pricing / Config
  */
-export async function updatePricing(key: string, value: number) {
+export async function updatePricing(key: string, value: number | string) {
     if (GOOGLE_SCRIPT_URL.includes('PASTE_YOUR') || GOOGLE_SCRIPT_URL === '') return;
 
     await fetch(GOOGLE_SCRIPT_URL, {
@@ -149,6 +149,6 @@ function getMockDayData(date: string) {
     return {
         booked: ['slot-19', 'slot-20'],
         blocked: ['slot-14'],
-        pricing: { basePrice: 800, peakPrice: 1200 }
+        pricing: { basePrice: 800, peakPrice: 1200, upiId: 'turf@upi', peakStartHour: 18 }
     };
 }

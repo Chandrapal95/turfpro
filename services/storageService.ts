@@ -42,7 +42,7 @@ const DEFAULT_PRICING: PricingConfig = {
   basePrice: 800,
   peakPrice: 1200,
   peakStartHour: 18,
-  weekendMultiplier: 1.1
+  upiId: 'turfpro@upi'
 };
 
 export const getPricingConfig = (): PricingConfig => {

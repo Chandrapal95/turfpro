@@ -20,7 +20,7 @@ export interface PricingConfig {
   basePrice: number;
   peakPrice: number;
   peakStartHour: number; // e.g. 18 (6 PM)
-  weekendMultiplier: number; // e.g. 1.2
+  upiId: string;         // e.g. merchant@upi
 }
 
 export interface TimeSlot {

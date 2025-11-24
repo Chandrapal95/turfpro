@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { getAdminData, toggleBlockSlot, updatePricing, approveBooking, rejectBooking } from '../services/api';
 import { generateMarketingCopy, analyzeBusinessInsights } from '../services/geminiService';
-import { Booking } from '../types';
+import { Booking, PricingConfig } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Users, Calendar as CalendarIcon, DollarSign, Lock, RefreshCw, Check, X, Image, Ban, Loader2, Search, Filter, Sparkles, Download, Copy, ExternalLink, BrainCircuit } from 'lucide-react';
+import { TrendingUp, Users, Calendar as CalendarIcon, DollarSign, Lock, RefreshCw, Check, X, Image, Ban, Loader2, Search, Filter, Sparkles, Download, Copy, ExternalLink, BrainCircuit, Settings, CreditCard, Clock } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -21,8 +21,12 @@ export const AdminDashboard: React.FC = () => {
   const [generatingAI, setGeneratingAI] = useState(false);
 
   // Settings State
-  const [basePrice, setBasePrice] = useState(800);
-  const [peakPrice, setPeakPrice] = useState(1200);
+  const [config, setConfig] = useState<PricingConfig>({
+      basePrice: 800,
+      peakPrice: 1200,
+      peakStartHour: 18,
+      upiId: 'turfpro@upi'
+  });
   const [blockedSlots, setBlockedSlots] = useState<any[]>([]);
   const [blockDate, setBlockDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
@@ -35,6 +39,14 @@ export const AdminDashboard: React.FC = () => {
     const data = await getAdminData();
     setBookings(data.bookings || []);
     setBlockedSlots(data.blocked || []);
+    
+    // Load config if available
+    if (data.config) {
+        setConfig(prev => ({
+            ...prev,
+            ...data.config
+        }));
+    }
     setLoading(false);
   };
 
@@ -57,11 +69,17 @@ export const AdminDashboard: React.FC = () => {
   };
 
   // Handlers
-  const handleUpdatePrice = async () => {
+  const handleSaveSettings = async () => {
       setLoading(true);
-      await updatePricing('basePrice', basePrice);
-      await updatePricing('peakPrice', peakPrice);
-      alert("Pricing updated in Google Sheets!");
+      try {
+        await updatePricing('basePrice', Number(config.basePrice));
+        await updatePricing('peakPrice', Number(config.peakPrice));
+        await updatePricing('peakStartHour', Number(config.peakStartHour));
+        await updatePricing('upiId', config.upiId);
+        alert("Settings saved successfully!");
+      } catch(e) {
+          alert("Failed to save settings.");
+      }
       setLoading(false);
   };
 
@@ -135,7 +153,7 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen pb-12 animate-fade-in">
-      <div className="bg-white shadow border-b border-gray-200 sticky top-0 z-30">
+      <div className="bg-white shadow border-b border-gray-200 sticky top-16 z-30">
           <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
               <h1 className="text-2xl font-bold text-gray-900 flex items-center">
                   Admin Dashboard 
@@ -143,16 +161,23 @@ export const AdminDashboard: React.FC = () => {
                       <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin text-green-600' : 'text-gray-500'}`} />
                   </button>
               </h1>
-              <div className="flex space-x-1 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
-                 {['DASHBOARD', 'BOOKINGS', 'SETTINGS', 'AI_LAB'].map((tab) => (
-                     <button 
-                        key={tab}
-                        onClick={() => setActiveTab(tab as any)}
-                        className={`px-4 py-2 rounded-md font-medium text-sm whitespace-nowrap transition-colors flex items-center ${activeTab === tab ? 'bg-gray-900 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}>
-                        {tab === 'AI_LAB' && <Sparkles className="w-4 h-4 mr-2 text-yellow-400" />}
-                        {tab.replace('_', ' ')}
-                     </button>
-                 ))}
+              <div className="flex items-center gap-4 w-full md:w-auto">
+                <div className="flex space-x-1 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
+                    {['DASHBOARD', 'BOOKINGS', 'SETTINGS', 'AI_LAB'].map((tab) => (
+                        <button 
+                            key={tab}
+                            onClick={() => setActiveTab(tab as any)}
+                            className={`px-4 py-2 rounded-md font-medium text-sm whitespace-nowrap transition-colors flex items-center ${activeTab === tab ? 'bg-gray-900 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}>
+                            {tab === 'AI_LAB' && <Sparkles className="w-4 h-4 mr-2 text-yellow-400" />}
+                            {tab.replace('_', ' ')}
+                        </button>
+                    ))}
+                </div>
+                <button 
+                    onClick={() => window.location.reload()} 
+                    className="hidden md:flex bg-white border border-gray-300 text-gray-600 px-3 py-2 rounded-md hover:bg-gray-50 text-sm font-medium items-center">
+                    <ExternalLink className="w-4 h-4 mr-2" /> Go to Site
+                </button>
               </div>
           </div>
       </div>
@@ -386,41 +411,84 @@ export const AdminDashboard: React.FC = () => {
 
         {activeTab === 'SETTINGS' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in">
+                {/* Site Configuration */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+                        <Settings className="w-5 h-5 mr-2 text-gray-600" /> General Settings
+                    </h3>
+                    <div className="space-y-6">
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                <CreditCard className="w-4 h-4 mr-2" /> UPI ID (for Payments)
+                            </label>
+                            <input 
+                                type="text" 
+                                value={config.upiId}
+                                onChange={(e) => setConfig({...config, upiId: e.target.value})}
+                                className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-green-500 focus:border-green-500 outline-none"
+                                placeholder="merchant@upi"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">This ID will be shown to users during booking.</p>
+                        </div>
+
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                <Clock className="w-4 h-4 mr-2" /> Peak Hour Start (24h format)
+                            </label>
+                            <input 
+                                type="number" 
+                                value={config.peakStartHour}
+                                onChange={(e) => setConfig({...config, peakStartHour: Number(e.target.value)})}
+                                className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-green-500 focus:border-green-500 outline-none"
+                                min={0} max={23}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Slots from this hour onwards will charge peak price.</p>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Pricing Configuration */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                        <DollarSign className="w-5 h-5 mr-2 text-green-600" /> Pricing Configuration
+                    <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+                        <DollarSign className="w-5 h-5 mr-2 text-green-600" /> Pricing Rules
                     </h3>
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Base Price (6 AM - 6 PM)</label>
-                            <input 
-                                type="number" 
-                                value={basePrice}
-                                onChange={(e) => setBasePrice(Number(e.target.value))}
-                                className="w-full border border-gray-300 rounded-md p-2 focus:ring-green-500 focus:border-green-500 outline-none"
-                            />
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Base Price (Off-Peak)</label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-2.5 text-gray-500">₹</span>
+                                <input 
+                                    type="number" 
+                                    value={config.basePrice}
+                                    onChange={(e) => setConfig({...config, basePrice: Number(e.target.value)})}
+                                    className="w-full pl-8 border border-gray-300 rounded-lg p-2.5 focus:ring-green-500 focus:border-green-500 outline-none"
+                                />
+                            </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Peak Price (6 PM - 11 PM)</label>
-                            <input 
-                                type="number" 
-                                value={peakPrice}
-                                onChange={(e) => setPeakPrice(Number(e.target.value))}
-                                className="w-full border border-gray-300 rounded-md p-2 focus:ring-green-500 focus:border-green-500 outline-none"
-                            />
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Peak Price (Evening/Weekend)</label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-2.5 text-gray-500">₹</span>
+                                <input 
+                                    type="number" 
+                                    value={config.peakPrice}
+                                    onChange={(e) => setConfig({...config, peakPrice: Number(e.target.value)})}
+                                    className="w-full pl-8 border border-gray-300 rounded-lg p-2.5 focus:ring-green-500 focus:border-green-500 outline-none"
+                                />
+                            </div>
                         </div>
+
                         <button 
-                            onClick={handleUpdatePrice}
+                            onClick={handleSaveSettings}
                             disabled={loading}
-                            className="w-full bg-green-600 text-white py-2 rounded-md font-medium hover:bg-green-700 transition">
-                            {loading ? 'Saving...' : 'Update Prices'}
+                            className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition shadow-md mt-2 flex justify-center items-center">
+                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save All Settings'}
                         </button>
                     </div>
                 </div>
 
                 {/* Block Slots */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                     <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
                         <Lock className="w-5 h-5 mr-2 text-red-500" /> Block Slots (Maintenance)
                     </h3>
@@ -431,12 +499,12 @@ export const AdminDashboard: React.FC = () => {
                             type="date" 
                             value={blockDate}
                             onChange={(e) => setBlockDate(e.target.value)}
-                            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-red-500 focus:border-red-500 outline-none"
+                            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-red-500 focus:border-red-500 outline-none max-w-xs"
                         />
                     </div>
 
-                    <div className="grid grid-cols-4 gap-2">
-                            {Array.from({length: 12}, (_, i) => i + 6).map(hour => {
+                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                            {Array.from({length: 18}, (_, i) => i + 6).map(hour => {
                                 const slotId = `slot-${hour}`;
                                 const isBlocked = blockedSlots.some(b => b.Date === blockDate && b.SlotId === slotId);
 
@@ -455,7 +523,7 @@ export const AdminDashboard: React.FC = () => {
                             })}
                     </div>
                     <p className="text-xs text-gray-400 mt-4 text-center">
-                        Red slots are currently blocked for {blockDate}.
+                        Red slots are blocked for {blockDate}. Users cannot book them.
                     </p>
                 </div>
             </div>

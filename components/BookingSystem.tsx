@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { TimeSlot } from '../types';
 import { getDayData, createBooking, FORMSPREE_URL } from '../services/api';
@@ -26,32 +26,41 @@ export const BookingSystem: React.FC<BookingSystemProps> = ({ onBookingComplete,
   // Data from Google Sheets
   const [bookedSlotIds, setBookedSlotIds] = useState<string[]>([]);
   const [blockedSlotIds, setBlockedSlotIds] = useState<string[]>([]);
+  
+  // Configuration State (Fetched from backend)
   const [pricing, setPricing] = useState({ basePrice: 800, peakPrice: 1200 });
-  const PEAK_START_HOUR = 18;
+  const [upiId, setUpiId] = useState("turfpro@upi");
+  const [peakStartHour, setPeakStartHour] = useState(18);
 
   // React Hook Form
   const { register, handleSubmit, formState: { errors }, reset } = useForm<BookingFormData>();
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
 
-  // --- CONFIG: REPLACE THESE WITH YOUR ACTUAL DETAILS ---
-  const UPI_ID = "turfpro@upi";
-  const QR_IMAGE_URL = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=" + UPI_ID + "&pn=TurfPro"; 
+  // QR Code Generation
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=${upiId}&pn=TurfPro`; 
 
-  // Fetch Availability when Date changes
+  // Auto-refresh interval
   useEffect(() => {
-      fetchAvailability();
+    fetchAvailability();
+    const interval = setInterval(fetchAvailability, 300000); // 5 mins
+    return () => clearInterval(interval);
   }, [selectedDate]);
 
   const fetchAvailability = async () => {
       setLoadingSlots(true);
-      const dateKey = selectedDate.toISOString().split('T')[0];
+      // Use Local Date String YYYY-MM-DD to match Google Sheet Format exactly
+      const dateKey = selectedDate.toLocaleDateString('en-CA');
       
       const data = await getDayData(dateKey);
       setBookedSlotIds(data.booked || []);
       setBlockedSlotIds(data.blocked || []);
-      if(data.pricing && data.pricing.basePrice) {
-          setPricing({ basePrice: data.pricing.basePrice, peakPrice: data.pricing.peakPrice });
+      
+      // Update Config from Backend
+      if(data.pricing) {
+          if (data.pricing.basePrice) setPricing({ basePrice: Number(data.pricing.basePrice), peakPrice: Number(data.pricing.peakPrice) });
+          if (data.pricing.upiId) setUpiId(data.pricing.upiId);
+          if (data.pricing.peakStartHour) setPeakStartHour(Number(data.pricing.peakStartHour));
       }
       setLoadingSlots(false);
   };
@@ -69,7 +78,7 @@ export const BookingSystem: React.FC<BookingSystemProps> = ({ onBookingComplete,
     return Array.from({ length: 18 }, (_, i) => {
         const hour = i + 6; // 6 AM to 11 PM
         const slotId = `slot-${hour}`;
-        const isPeak = hour >= PEAK_START_HOUR;
+        const isPeak = hour >= peakStartHour;
         
         let price = isPeak ? pricing.peakPrice : pricing.basePrice;
         if (isWeekend) price = Math.round(price * 1.2); 
@@ -79,9 +88,9 @@ export const BookingSystem: React.FC<BookingSystemProps> = ({ onBookingComplete,
             startTime: `${hour.toString().padStart(2, '0')}:00`,
             endTime: `${(hour + 1).toString().padStart(2, '0')}:00`,
             price: price,
-            isBooked: bookedSlotIds.includes(slotId),
+            isBooked: bookedSlotIds.includes(slotId), // This includes soft-locked (pending) slots from backend
             isBlocked: blockedSlotIds.includes(slotId),
-            isPending: false 
+            isPending: false // Visual distinction handled by simple booked check now
         };
     });
   };
@@ -126,7 +135,7 @@ export const BookingSystem: React.FC<BookingSystemProps> = ({ onBookingComplete,
           setScreenshotFile(file);
           
           try {
-             // Preview only for now, compression happens on submit
+             // Preview only
              const reader = new FileReader();
              reader.onload = (ev) => setScreenshotPreview(ev.target?.result as string);
              reader.readAsDataURL(file);
@@ -150,7 +159,7 @@ export const BookingSystem: React.FC<BookingSystemProps> = ({ onBookingComplete,
         const base64Image = await compressImage(screenshotFile);
 
         const bookingPayload = {
-          date: selectedDate.toISOString().split('T')[0],
+          date: selectedDate.toLocaleDateString('en-CA'), // YYYY-MM-DD
           slotId: selectedSlot.id,
           name: data.name,
           phone: data.phone,
@@ -166,7 +175,7 @@ export const BookingSystem: React.FC<BookingSystemProps> = ({ onBookingComplete,
             console.error("Booking failed:", result.message);
             setErrorMsg(result.message || "Booking failed. Please try again.");
             setSubmitting(false);
-            fetchAvailability(); 
+            fetchAvailability(); // Refresh to see if slot was taken
             return;
         }
 
@@ -189,6 +198,10 @@ export const BookingSystem: React.FC<BookingSystemProps> = ({ onBookingComplete,
 
         setSubmitting(false);
         setBookingStep('CONFIRMATION');
+        
+        // IMMEDIATE REFRESH to show slot as booked (soft locked)
+        fetchAvailability();
+
         if(onBookingComplete) onBookingComplete();
 
     } catch (error) {
@@ -199,13 +212,13 @@ export const BookingSystem: React.FC<BookingSystemProps> = ({ onBookingComplete,
   };
 
   const handleCopyUPI = () => {
-      navigator.clipboard.writeText(UPI_ID);
+      navigator.clipboard.writeText(upiId);
       alert("UPI ID Copied!");
   };
 
   const downloadQR = () => {
       const link = document.createElement('a');
-      link.href = QR_IMAGE_URL;
+      link.href = qrImageUrl;
       link.download = 'TurfPro_UPI_QR.png';
       document.body.appendChild(link);
       link.click();
@@ -234,7 +247,7 @@ export const BookingSystem: React.FC<BookingSystemProps> = ({ onBookingComplete,
                  </h3>
                  <div className="flex space-x-3 overflow-x-auto pb-4 scrollbar-hide py-2">
                     {dates.map((date) => {
-                        const isSelected = date.toISOString().split('T')[0] === selectedDate.toISOString().split('T')[0];
+                        const isSelected = date.toLocaleDateString('en-CA') === selectedDate.toLocaleDateString('en-CA');
                         const isWeekend = date.getDay() === 0 || date.getDay() === 6;
                         return (
                         <button
@@ -271,8 +284,14 @@ export const BookingSystem: React.FC<BookingSystemProps> = ({ onBookingComplete,
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
                     {getSlotsForDate().map((slot) => {
+                        // In BookingSystem, isBooked includes "PENDING" slots from backend check
                         const unavailable = slot.isBooked || slot.isBlocked;
                         const isPeak = slot.price > pricing.basePrice;
+                        
+                        // We can optionally distinguish "On Hold" visually if we passed pending separately
+                        // For now, we treat Pending as Booked (Gray) or we can make it Orange
+                        // Let's rely on standard unavailable style to keep it simple, or add a specific check if we want
+                        
                         return (
                             <button
                                 key={slot.id}
@@ -308,7 +327,7 @@ export const BookingSystem: React.FC<BookingSystemProps> = ({ onBookingComplete,
             <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex items-start">
                <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
                <p className="text-sm text-blue-800 leading-relaxed">
-                   <strong>Note:</strong> Peak hours ({PEAK_START_HOUR}:00 onwards) and Weekends have higher rates.
+                   <strong>Note:</strong> Peak hours ({peakStartHour}:00 onwards) and Weekends have higher rates.
                </p>
             </div>
           </div>
@@ -378,14 +397,14 @@ export const BookingSystem: React.FC<BookingSystemProps> = ({ onBookingComplete,
                   </h4>
                   
                   <div className="flex flex-col items-center mb-6">
-                      <img src={QR_IMAGE_URL} alt="UPI QR" className="w-48 h-48 border rounded-lg shadow-sm mb-4" />
+                      <img src={qrImageUrl} alt="UPI QR" className="w-48 h-48 border rounded-lg shadow-sm mb-4" />
                       <button type="button" onClick={downloadQR} className="text-xs flex items-center text-gray-600 hover:text-green-600 font-medium border px-3 py-1.5 rounded-full">
                           <Download className="w-3 h-3 mr-1" /> Download QR
                       </button>
                   </div>
 
                   <div className="flex items-center space-x-2 bg-gray-50 p-3 rounded-lg border border-gray-200 mb-4">
-                      <div className="flex-1 font-mono text-sm text-gray-700 text-center">{UPI_ID}</div>
+                      <div className="flex-1 font-mono text-sm text-gray-700 text-center">{upiId}</div>
                       <button type="button" onClick={handleCopyUPI} className="p-2 text-gray-500 hover:text-green-600">
                           <Copy className="w-4 h-4" />
                       </button>

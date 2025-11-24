@@ -62,18 +62,28 @@ function getAvailability(date) {
     const rowDate = bRows[i][1]; // Date column
     const slotId = bRows[i][2];  // Slot column
     const status = bRows[i][7];  // Status column
-    const timestamp = new Date(bRows[i][8]); // Timestamp column
+    const timestampStr = bRows[i][8]; // Timestamp column
 
     if (rowDate === date) {
       if (status === 'CONFIRMED') {
         bookedSlots.push(slotId);
       } else if (status === 'PENDING') {
-        // SOFT LOCK LOGIC: Check if created within last 4 hours
+        // SOFT LOCK LOGIC
+        // Try to parse timestamp. If invalid, default to treating as booked to be safe.
+        let timestamp;
+        try {
+            timestamp = new Date(timestampStr);
+            if(isNaN(timestamp.getTime())) throw new Error("Invalid Date");
+        } catch(e) {
+             // If date is unparsable, we block the slot to be safe
+             bookedSlots.push(slotId);
+             continue;
+        }
+
         const diffHours = (now - timestamp) / (1000 * 60 * 60);
         if (diffHours < 4) {
            bookedSlots.push(slotId);
         }
-        // If > 4 hours, we treat it as free (expired)
       }
     }
   }
@@ -87,7 +97,7 @@ function getAvailability(date) {
     }
   }
 
-  // Get Pricing
+  // Get Pricing & Config
   const cRows = configSheet.getDataRange().getValues();
   const pricing = {};
   for(let i = 1; i < cRows.length; i++) {
@@ -97,41 +107,45 @@ function getAvailability(date) {
   return response({
     booked: bookedSlots,
     blocked: blockedSlots,
-    pricing: pricing
+    pricing: pricing // Contains basePrice, peakPrice, upiId, peakStartHour
   });
 }
 
 function createBooking(data) {
-  // LOCK to prevent double booking race conditions
   const lock = LockService.getScriptLock();
   try {
-    lock.waitLock(10000); // Wait up to 10s
+    lock.waitLock(10000); 
     
     const sheet = SS.getSheetByName("Bookings");
     const rows = sheet.getDataRange().getValues();
     const now = new Date();
     
-    // Double check availability (Include Soft Lock Check)
+    // Double check availability
     for (let i = 1; i < rows.length; i++) {
       const rowDate = rows[i][1];
       const slotId = rows[i][2];
       const status = rows[i][7];
-      const timestamp = new Date(rows[i][8]);
+      const timestampStr = rows[i][8];
 
       if (rowDate === data.date && slotId === data.slotId) {
           if (status === 'CONFIRMED') {
             return response({status: 'error', message: 'Slot already booked'});
           }
           if (status === 'PENDING') {
-            const diffHours = (now - timestamp) / (1000 * 60 * 60);
-            if (diffHours < 4) {
-               return response({status: 'error', message: 'Slot is currently on hold (Pending Approval)'});
-            }
+             let timestamp = new Date(timestampStr);
+             // If timestamp is invalid, default to locked
+             if(isNaN(timestamp.getTime())) {
+                 return response({status: 'error', message: 'Slot unavailable (System Check)'});
+             }
+
+             const diffHours = (now - timestamp) / (1000 * 60 * 60);
+             if (diffHours < 4) {
+               return response({status: 'error', message: 'Slot is currently on hold'});
+             }
           }
       }
     }
 
-    // Upload Image to Drive
     let screenshotUrl = 'N/A';
     if (data.image) {
        screenshotUrl = uploadToDrive(data.image, data.name + "_" + data.date);
@@ -140,16 +154,15 @@ function createBooking(data) {
     const id = Math.random().toString(36).substr(2, 9);
     const timestampStr = now.toISOString();
     
-    // 'BookingId', 'Date', 'Slot', 'Name', 'Phone', 'Email', 'Amount', 'Status', 'Timestamp', 'PaymentId', 'ScreenshotUrl'
     sheet.appendRow([
       id,
       data.date,
       data.slotId,
       data.name,
       data.phone,
-      'N/A', // Email removed
+      'N/A', 
       data.amount,
-      'PENDING', // Initial status is PENDING
+      'PENDING', 
       timestampStr,
       data.paymentId || 'N/A',
       screenshotUrl
@@ -169,10 +182,7 @@ function updateBookingStatus(bookingId, newStatus) {
    const rows = sheet.getDataRange().getValues();
    
    for (let i = 1; i < rows.length; i++) {
-     if (rows[i][0] == bookingId) { // Column A is ID (index 0)
-       // Column H is Status. A=1, B=2 ... H=8.
-       // In getRange(row, col), row is 1-based, col is 1-based.
-       // rows[i] corresponds to sheet row i+1.
+     if (rows[i][0] == bookingId) { 
        sheet.getRange(i + 1, 8).setValue(newStatus); 
        return response({status: 'success'});
      }
@@ -183,14 +193,26 @@ function updateBookingStatus(bookingId, newStatus) {
 function getAllData() {
   const bSheet = SS.getSheetByName("Bookings");
   const blSheet = SS.getSheetByName("Blocked");
+  const cSheet = SS.getSheetByName("Config");
   
   const bookings = sheetToJson(bSheet);
   const blocked = sheetToJson(blSheet);
   
-  // Sort bookings by newest first
-  bookings.sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp));
+  // Sort bookings
+  bookings.sort((a, b) => {
+      const dateA = new Date(a.Timestamp);
+      const dateB = new Date(b.Timestamp);
+      return isNaN(dateA) || isNaN(dateB) ? 0 : dateB - dateA;
+  });
+
+  // Get Config
+  const cRows = cSheet.getDataRange().getValues();
+  const config = {};
+  for(let i = 1; i < cRows.length; i++) {
+    config[cRows[i][0]] = cRows[i][1];
+  }
   
-  return response({ bookings: bookings, blocked: blocked });
+  return response({ bookings: bookings, blocked: blocked, config: config });
 }
 
 function toggleBlock(data) {
@@ -238,7 +260,6 @@ function uploadToDrive(base64Data, fileName) {
       folder = DriveApp.createFolder(UPLOAD_FOLDER_NAME);
     }
     
-    // data:image/png;base64,.....
     const split = base64Data.split(',');
     const type = split[0].split(';')[0].replace('data:', '');
     const data = Utilities.base64Decode(split[1]);
@@ -249,7 +270,7 @@ function uploadToDrive(base64Data, fileName) {
     
     return file.getUrl();
   } catch (e) {
-    return "Error: " + e.toString();
+    return "Error Uploading: " + e.toString();
   }
 }
 
