@@ -26,7 +26,7 @@ const MOCK_ADMIN: User = {
  */
 export async function getDayData(date: string) {
     if (GOOGLE_SCRIPT_URL.includes('PASTE_YOUR') || GOOGLE_SCRIPT_URL === '') {
-        console.warn("Using mock data because GOOGLE_SCRIPT_URL is not set.");
+        console.log("Using Mock Data for Availability");
         return getMockDayData(date);
     }
 
@@ -45,6 +45,7 @@ export async function getDayData(date: string) {
  */
 export async function createBooking(bookingData: any) {
     if (GOOGLE_SCRIPT_URL.includes('PASTE_YOUR') || GOOGLE_SCRIPT_URL === '') {
+        console.log("Mock Booking Created");
         return { status: 'success', bookingId: 'mock-id-' + Date.now() };
     }
 
@@ -93,7 +94,7 @@ export async function rejectBooking(bookingId: string) {
  */
 export async function getAdminData() {
     if (GOOGLE_SCRIPT_URL.includes('PASTE_YOUR') || GOOGLE_SCRIPT_URL === '') {
-        return { bookings: [], blocked: [], config: { basePrice: 800, peakPrice: 1200, upiId: 'mock@upi', peakStartHour: 18 } };
+        return getMockAdminData();
     }
 
     try {
@@ -143,12 +144,42 @@ export const loginUser = (email: string, password: string): Promise<User> => {
 };
 
 // ------------------------------------------------------------------
-// MOCK DATA
+// MOCK DATA GENERATORS
 // ------------------------------------------------------------------
 function getMockDayData(date: string) {
     return {
         booked: ['slot-19', 'slot-20'],
         blocked: ['slot-14'],
         pricing: { basePrice: 800, peakPrice: 1200, upiId: 'turf@upi', peakStartHour: 18 }
+    };
+}
+
+function getMockAdminData() {
+    const today = new Date();
+    const mockBookings = [];
+    
+    // Generate 15 bookings for the past 5 days
+    for(let i=0; i<15; i++) {
+        const d = new Date();
+        d.setDate(today.getDate() - (i % 5));
+        
+        mockBookings.push({
+            BookingId: `mock-${i}`,
+            Date: d.toLocaleDateString('en-CA'),
+            Slot: `slot-${17 + (i%5)}`,
+            Name: `Customer ${i+1}`,
+            Phone: `98765432${i.toString().padStart(2, '0')}`,
+            Amount: (17 + (i%5)) >= 18 ? 1200 : 800,
+            Status: i < 2 ? 'PENDING' : (i % 4 === 0 ? 'CANCELLED' : 'CONFIRMED'),
+            Timestamp: d.toISOString(),
+            PaymentId: `UPI-${Math.random().toString(36).substr(2,6)}`,
+            ScreenshotUrl: 'N/A'
+        });
+    }
+
+    return { 
+        bookings: mockBookings, 
+        blocked: [], 
+        config: { basePrice: 800, peakPrice: 1200, upiId: 'mock@upi', peakStartHour: 18 } 
     };
 }
