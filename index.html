@@ -15,6 +15,16 @@
     <meta property="og:description" content="Premium cricket turf with night lights. Book your slot now!">
     <meta property="og:image" content="https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80">
     
+    <!-- CRITICAL FIX: Polyfill 'process' for client-side libraries that expect Node.js environment -->
+    <script>
+      window.process = {
+        env: {
+          NODE_ENV: 'production',
+          API_KEY: '' // This prevents crash, though AI features will need a key configured
+        }
+      };
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -33,6 +43,9 @@
         to { opacity: 1; transform: translateY(0); }
       }
       .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+      
+      .prose ul { list-style-type: disc; padding-left: 1.5rem; }
+      .prose ol { list-style-type: decimal; padding-left: 1.5rem; }
     </style>
   <script type="importmap">
 {

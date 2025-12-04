@@ -1,15 +1,24 @@
 import { GoogleGenAI } from "@google/genai";
 import { Booking } from "../types";
 
-// Initialize Gemini Client
-// Using process.env.API_KEY as required by the guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Safely access API key
+const getApiKey = () => {
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    return process.env.API_KEY;
+  }
+  return '';
+};
+
+const apiKey = getApiKey();
+// Initialize Gemini Client only if key exists to avoid constructor errors, 
+// otherwise dummy it out (functions will check for key before calling)
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // Using the correct model for text tasks
 const MODEL_NAME = 'gemini-2.5-flash';
 
 export const generateMarketingCopy = async (bookings: Booking[]): Promise<string> => {
-  if (!process.env.API_KEY) return "API Key missing. Cannot generate content. Please check environment variables.";
+  if (!ai || !apiKey) return "API Key missing. Cannot generate content. Please check environment variables.";
 
   const bookingCount = bookings.filter(b => b.Status === 'CONFIRMED').length;
   const prompt = `
@@ -32,7 +41,7 @@ export const generateMarketingCopy = async (bookings: Booking[]): Promise<string
 };
 
 export const analyzeBusinessInsights = async (bookings: Booking[], totalRevenue: number): Promise<string> => {
-    if (!process.env.API_KEY) return "API Key missing.";
+    if (!ai || !apiKey) return "API Key missing.";
     
     // Summarize data to avoid token limits
     const dataSummary = JSON.stringify(bookings.slice(0, 30).map(b => ({ 
