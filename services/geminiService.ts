@@ -9,7 +9,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const MODEL_NAME = 'gemini-2.5-flash';
 
 export const generateMarketingCopy = async (bookings: Booking[]): Promise<string> => {
-  if (!process.env.API_KEY) return "API Key missing. Cannot generate content.";
+  if (!process.env.API_KEY) return "API Key missing. Cannot generate content. Please check environment variables.";
 
   const bookingCount = bookings.filter(b => b.Status === 'CONFIRMED').length;
   const prompt = `
@@ -27,7 +27,7 @@ export const generateMarketingCopy = async (bookings: Booking[]): Promise<string
     return response.text || "Book your slot today!";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Error generating content. Please try again.";
+    return "Error generating content. Please try again later.";
   }
 };
 
@@ -38,14 +38,15 @@ export const analyzeBusinessInsights = async (bookings: Booking[], totalRevenue:
     const dataSummary = JSON.stringify(bookings.slice(0, 30).map(b => ({ 
       date: b.Date, 
       amount: b.Amount, 
-      status: b.Status 
+      status: b.Status,
+      slot: b.Slot
     })));
     
     const prompt = `
       Act as a business analyst. Here is a sample of recent booking data for my cricket turf: ${dataSummary}.
       Total revenue is ${totalRevenue}.
-      Provide 3 brief bullet points on business performance and 1 suggestion to improve revenue.
-      Keep it professional and concise.
+      Provide 3 brief, actionable bullet points on business performance and 1 specific suggestion to improve revenue.
+      Format using Markdown.
     `;
   
     try {

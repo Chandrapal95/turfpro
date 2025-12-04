@@ -55,9 +55,7 @@ export interface Review {
   comment: string;
 }
 
-// Global declaration for Razorpay (Removed as requested, but keeping generic window just in case)
 declare global {
   interface Window {
-    // Razorpay removed
   }
 }
