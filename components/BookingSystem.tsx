@@ -196,10 +196,13 @@ export const BookingSystem: React.FC<BookingSystemProps> = ({ onBookingComplete,
             });
         } catch (e) { console.error("Email trigger failed", e); }
 
+        // OPTIMISTIC UPDATE: Instantly lock the slot in UI
+        setBookedSlotIds(prev => [...prev, selectedSlot.id]);
+
         setSubmitting(false);
         setBookingStep('CONFIRMATION');
         
-        // IMMEDIATE REFRESH to show slot as booked (soft locked)
+        // Background refresh to sync with server
         fetchAvailability();
 
         if(onBookingComplete) onBookingComplete();
@@ -284,13 +287,8 @@ export const BookingSystem: React.FC<BookingSystemProps> = ({ onBookingComplete,
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
                     {getSlotsForDate().map((slot) => {
-                        // In BookingSystem, isBooked includes "PENDING" slots from backend check
                         const unavailable = slot.isBooked || slot.isBlocked;
                         const isPeak = slot.price > pricing.basePrice;
-                        
-                        // We can optionally distinguish "On Hold" visually if we passed pending separately
-                        // For now, we treat Pending as Booked (Gray) or we can make it Orange
-                        // Let's rely on standard unavailable style to keep it simple, or add a specific check if we want
                         
                         return (
                             <button

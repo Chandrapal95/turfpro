@@ -366,19 +366,19 @@ export const AdminDashboard: React.FC = () => {
                                                      <Loader2 className="w-5 h-5 animate-spin text-gray-400 ml-auto" />
                                                 ) : (
                                                     <div className="flex justify-end space-x-2">
-                                                        {booking.Status === 'PENDING' && (
+                                                        {(booking.Status === 'PENDING' || booking.Status.toUpperCase() === 'PENDING') && (
                                                             <>
                                                                 <button 
                                                                     onClick={() => handleApprove(booking.BookingId)} 
-                                                                    className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 border border-green-200 transition" 
+                                                                    className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700 transition flex items-center shadow-sm"
                                                                     title="Approve Booking">
-                                                                    <Check className="w-4 h-4" />
+                                                                    <Check className="w-3 h-3 mr-1" /> Approve
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => handleReject(booking.BookingId)} 
-                                                                    className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 border border-red-200 transition" 
+                                                                    className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-700 transition flex items-center shadow-sm"
                                                                     title="Reject Booking">
-                                                                    <X className="w-4 h-4" />
+                                                                    <X className="w-3 h-3 mr-1" /> Reject
                                                                 </button>
                                                             </>
                                                         )}

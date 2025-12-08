@@ -26,31 +26,35 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  // Handle CORS for POST requests
-  const data = JSON.parse(e.postData.contents);
-  const action = data.action;
+  // Handle CORS for POST requests - Google Apps Script requires text/plain to avoid preflight
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action;
 
-  if (action === 'createBooking') {
-    return createBooking(data);
-  } else if (action === 'toggleBlock') {
-    return toggleBlock(data);
-  } else if (action === 'updatePrice') {
-    return updatePrice(data);
-  } else if (action === 'approveBooking') {
-    return updateBookingStatus(data.bookingId, 'CONFIRMED');
-  } else if (action === 'rejectBooking') {
-    return updateBookingStatus(data.bookingId, 'REJECTED');
+    if (action === 'createBooking') {
+      return createBooking(data);
+    } else if (action === 'toggleBlock') {
+      return toggleBlock(data);
+    } else if (action === 'updatePrice') {
+      return updatePrice(data);
+    } else if (action === 'approveBooking') {
+      return updateBookingStatus(data.bookingId, 'CONFIRMED');
+    } else if (action === 'rejectBooking') {
+      return updateBookingStatus(data.bookingId, 'REJECTED');
+    }
+    
+    return response({status: 'error', message: 'Invalid action: ' + action});
+  } catch (error) {
+    return response({status: 'error', message: 'Server Error: ' + error.toString()});
   }
-  
-  return response({status: 'error', message: 'Invalid action'});
 }
 
 // --- Logic ---
 
 function getAvailability(date) {
-  const bookingsSheet = SS.getSheetByName("Bookings");
-  const blockedSheet = SS.getSheetByName("Blocked");
-  const configSheet = SS.getSheetByName("Config");
+  const bookingsSheet = getOrCreateSheet("Bookings");
+  const blockedSheet = getOrCreateSheet("Blocked");
+  const configSheet = getOrCreateSheet("Config");
 
   // Get Bookings
   const bRows = bookingsSheet.getDataRange().getValues();
@@ -58,10 +62,14 @@ function getAvailability(date) {
   const now = new Date();
   
   // Skip header, filter by date
+  // Data starts at row 1 (index 1) if header exists
   for (let i = 1; i < bRows.length; i++) {
+    // Safety check for empty rows
+    if (!bRows[i][0]) continue;
+
     const rowDate = bRows[i][1]; // Date column
     const slotId = bRows[i][2];  // Slot column
-    const status = bRows[i][7];  // Status column
+    const status = bRows[i][7].toString().toUpperCase();  // Status column (Normalized)
     const timestampStr = bRows[i][8]; // Timestamp column
 
     if (rowDate === date) {
@@ -69,7 +77,6 @@ function getAvailability(date) {
         bookedSlots.push(slotId);
       } else if (status === 'PENDING') {
         // SOFT LOCK LOGIC
-        // Try to parse timestamp. If invalid, default to treating as booked to be safe.
         let timestamp;
         try {
             timestamp = new Date(timestampStr);
@@ -107,7 +114,7 @@ function getAvailability(date) {
   return response({
     booked: bookedSlots,
     blocked: blockedSlots,
-    pricing: pricing // Contains basePrice, peakPrice, upiId, peakStartHour
+    pricing: pricing 
   });
 }
 
@@ -116,15 +123,17 @@ function createBooking(data) {
   try {
     lock.waitLock(10000); 
     
-    const sheet = SS.getSheetByName("Bookings");
+    const sheet = getOrCreateSheet("Bookings");
     const rows = sheet.getDataRange().getValues();
     const now = new Date();
     
     // Double check availability
     for (let i = 1; i < rows.length; i++) {
+      if(!rows[i][0]) continue;
+
       const rowDate = rows[i][1];
       const slotId = rows[i][2];
-      const status = rows[i][7];
+      const status = rows[i][7].toString().toUpperCase();
       const timestampStr = rows[i][8];
 
       if (rowDate === data.date && slotId === data.slotId) {
@@ -133,11 +142,9 @@ function createBooking(data) {
           }
           if (status === 'PENDING') {
              let timestamp = new Date(timestampStr);
-             // If timestamp is invalid, default to locked
              if(isNaN(timestamp.getTime())) {
                  return response({status: 'error', message: 'Slot unavailable (System Check)'});
              }
-
              const diffHours = (now - timestamp) / (1000 * 60 * 60);
              if (diffHours < 4) {
                return response({status: 'error', message: 'Slot is currently on hold'});
@@ -178,11 +185,13 @@ function createBooking(data) {
 }
 
 function updateBookingStatus(bookingId, newStatus) {
-   const sheet = SS.getSheetByName("Bookings");
+   const sheet = getOrCreateSheet("Bookings");
    const rows = sheet.getDataRange().getValues();
    
    for (let i = 1; i < rows.length; i++) {
      if (rows[i][0] == bookingId) { 
+       // Status is in column 8 (Index 7, but allow for offset if header changed)
+       // Fixed: Column H is index 8 (1-based) in getRange
        sheet.getRange(i + 1, 8).setValue(newStatus); 
        return response({status: 'success'});
      }
@@ -191,9 +200,9 @@ function updateBookingStatus(bookingId, newStatus) {
 }
 
 function getAllData() {
-  const bSheet = SS.getSheetByName("Bookings");
-  const blSheet = SS.getSheetByName("Blocked");
-  const cSheet = SS.getSheetByName("Config");
+  const bSheet = getOrCreateSheet("Bookings");
+  const blSheet = getOrCreateSheet("Blocked");
+  const cSheet = getOrCreateSheet("Config");
   
   const bookings = sheetToJson(bSheet);
   const blocked = sheetToJson(blSheet);
@@ -216,7 +225,7 @@ function getAllData() {
 }
 
 function toggleBlock(data) {
-  const sheet = SS.getSheetByName("Blocked");
+  const sheet = getOrCreateSheet("Blocked");
   const rows = sheet.getDataRange().getValues();
   
   for (let i = 1; i < rows.length; i++) {
@@ -231,7 +240,7 @@ function toggleBlock(data) {
 }
 
 function updatePrice(data) {
-  const sheet = SS.getSheetByName("Config");
+  const sheet = getOrCreateSheet("Config");
   const rows = sheet.getDataRange().getValues();
   let found = false;
   
@@ -249,6 +258,18 @@ function updatePrice(data) {
 }
 
 // --- Helpers ---
+
+function getOrCreateSheet(name) {
+  let sheet = SS.getSheetByName(name);
+  if (!sheet) {
+    sheet = SS.insertSheet(name);
+    // Add Headers if new
+    if(name === "Bookings") sheet.appendRow(["BookingId", "Date", "Slot", "Name", "Phone", "Email", "Amount", "Status", "Timestamp", "PaymentId", "ScreenshotUrl"]);
+    if(name === "Blocked") sheet.appendRow(["Date", "SlotId", "Reason"]);
+    if(name === "Config") sheet.appendRow(["Key", "Value"]);
+  }
+  return sheet;
+}
 
 function uploadToDrive(base64Data, fileName) {
   try {
