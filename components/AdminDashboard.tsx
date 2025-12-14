@@ -330,7 +330,10 @@ export const AdminDashboard: React.FC = () => {
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {filteredBookings.length > 0 ? (
-                                    filteredBookings.map((booking, idx) => (
+                                    filteredBookings.map((booking, idx) => {
+                                        const isPending = booking.Status && String(booking.Status).toUpperCase() === 'PENDING';
+                                        
+                                        return (
                                         <tr key={idx} className="bg-white hover:bg-gray-50 transition">
                                             <td className="px-6 py-4">
                                                 <div className="font-medium text-gray-900 whitespace-nowrap">{booking.Date}</div>
@@ -355,7 +358,7 @@ export const AdminDashboard: React.FC = () => {
                                             <td className="px-6 py-4">
                                                 <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
                                                     booking.Status === 'CONFIRMED' ? 'bg-green-100 text-green-800' : 
-                                                    booking.Status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                                                    isPending ? 'bg-yellow-100 text-yellow-800' :
                                                     'bg-red-100 text-red-800'
                                                 }`}>
                                                     {booking.Status}
@@ -366,7 +369,7 @@ export const AdminDashboard: React.FC = () => {
                                                      <Loader2 className="w-5 h-5 animate-spin text-gray-400 ml-auto" />
                                                 ) : (
                                                     <div className="flex justify-end space-x-2">
-                                                        {(booking.Status === 'PENDING' || booking.Status.toUpperCase() === 'PENDING') && (
+                                                        {isPending && (
                                                             <>
                                                                 <button 
                                                                     onClick={() => handleApprove(booking.BookingId)} 
@@ -394,7 +397,7 @@ export const AdminDashboard: React.FC = () => {
                                                 )}
                                             </td>
                                         </tr>
-                                    ))
+                                    )})
                                 ) : (
                                     <tr>
                                         <td colSpan={5} className="px-6 py-12 text-center text-gray-500">

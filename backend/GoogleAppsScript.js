@@ -69,7 +69,9 @@ function getAvailability(date) {
 
     const rowDate = bRows[i][1]; // Date column
     const slotId = bRows[i][2];  // Slot column
-    const status = bRows[i][7].toString().toUpperCase();  // Status column (Normalized)
+    // Safety: ensure cell value exists before string conversion
+    const statusRaw = bRows[i][7];
+    const status = (statusRaw || "").toString().toUpperCase(); 
     const timestampStr = bRows[i][8]; // Timestamp column
 
     if (rowDate === date) {
@@ -133,7 +135,9 @@ function createBooking(data) {
 
       const rowDate = rows[i][1];
       const slotId = rows[i][2];
-      const status = rows[i][7].toString().toUpperCase();
+      // Safety check
+      const statusRaw = rows[i][7];
+      const status = (statusRaw || "").toString().toUpperCase();
       const timestampStr = rows[i][8];
 
       if (rowDate === data.date && slotId === data.slotId) {
