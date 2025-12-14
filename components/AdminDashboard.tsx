@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { getAdminData, toggleBlockSlot, updatePricing, approveBooking, rejectBooking } from '../services/api';
 import { generateMarketingCopy, analyzeBusinessInsights } from '../services/geminiService';
-import { Booking, PricingConfig } from '../types';
+import { Booking, PricingConfig, ViewState } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Users, Calendar as CalendarIcon, DollarSign, Lock, RefreshCw, Check, X, Image, Ban, Loader2, Search, Filter, Sparkles, Download, Copy, ExternalLink, BrainCircuit, Settings, CreditCard, Clock } from 'lucide-react';
+import { TrendingUp, Users, Calendar as CalendarIcon, DollarSign, Lock, RefreshCw, Check, X, Image, Ban, Loader2, Search, Filter, Sparkles, Download, Copy, ExternalLink, BrainCircuit, Settings, CreditCard, Clock, WifiOff } from 'lucide-react';
 
-export const AdminDashboard: React.FC = () => {
+interface AdminDashboardProps {
+  onNavigate: (view: ViewState) => void;
+}
+
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'BOOKINGS' | 'SETTINGS' | 'AI_LAB'>('DASHBOARD');
   const [loading, setLoading] = useState(false);
@@ -146,465 +150,377 @@ export const AdminDashboard: React.FC = () => {
 
   // Filter Bookings
   const filteredBookings = bookings.filter(b => {
-      const matchesSearch = b.Name.toLowerCase().includes(searchTerm.toLowerCase()) || b.Phone.includes(searchTerm);
-      const matchesFilter = filterStatus === 'ALL' || b.Status === filterStatus;
-      return matchesSearch && matchesFilter;
+    const matchesSearch = b.Name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          b.Phone.includes(searchTerm) ||
+                          b.BookingId.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'ALL' || b.Status === filterStatus;
+    return matchesSearch && matchesStatus;
   });
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-12 animate-fade-in">
-      <div className="bg-white shadow border-b border-gray-200 sticky top-16 z-30">
-          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-                  Admin Dashboard 
-                  <button onClick={refreshData} className="ml-3 p-1 rounded hover:bg-gray-100 transition" title="Refresh Data">
-                      <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin text-green-600' : 'text-gray-500'}`} />
-                  </button>
-              </h1>
-              <div className="flex items-center gap-4 w-full md:w-auto">
-                <div className="flex space-x-1 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
-                    {['DASHBOARD', 'BOOKINGS', 'SETTINGS', 'AI_LAB'].map((tab) => (
-                        <button 
-                            key={tab}
-                            onClick={() => setActiveTab(tab as any)}
-                            className={`px-4 py-2 rounded-md font-medium text-sm whitespace-nowrap transition-colors flex items-center ${activeTab === tab ? 'bg-gray-900 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}>
-                            {tab === 'AI_LAB' && <Sparkles className="w-4 h-4 mr-2 text-yellow-400" />}
-                            {tab.replace('_', ' ')}
-                        </button>
-                    ))}
-                </div>
-                <button 
-                    onClick={() => window.location.reload()} 
-                    className="hidden md:flex bg-white border border-gray-300 text-gray-600 px-3 py-2 rounded-md hover:bg-gray-50 text-sm font-medium items-center">
-                    <ExternalLink className="w-4 h-4 mr-2" /> Go to Site
-                </button>
-              </div>
+    <div className="flex min-h-screen bg-gray-100 font-sans">
+      {/* Sidebar */}
+      <div className="w-64 bg-slate-900 text-white flex flex-col shadow-2xl">
+        <div className="p-6 border-b border-slate-800">
+          <div className="flex items-center space-x-2 text-green-400 font-bold text-2xl">
+             <Trophy className="w-8 h-8" />
+             <span>Turf<span className="text-white">Admin</span></span>
           </div>
+        </div>
+        
+        <nav className="flex-1 py-6 px-4 space-y-2">
+           <button onClick={() => setActiveTab('DASHBOARD')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === 'DASHBOARD' ? 'bg-green-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+              <TrendingUp className="w-5 h-5" /> <span>Dashboard</span>
+           </button>
+           <button onClick={() => setActiveTab('BOOKINGS')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === 'BOOKINGS' ? 'bg-green-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+              <CalendarIcon className="w-5 h-5" /> <span>Bookings</span>
+           </button>
+           <button onClick={() => setActiveTab('AI_LAB')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === 'AI_LAB' ? 'bg-green-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+              <BrainCircuit className="w-5 h-5" /> <span>AI Insights</span>
+           </button>
+           <button onClick={() => setActiveTab('SETTINGS')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition ${activeTab === 'SETTINGS' ? 'bg-green-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+              <Settings className="w-5 h-5" /> <span>Settings</span>
+           </button>
+        </nav>
+
+        <div className="p-4 border-t border-slate-800">
+           <button onClick={() => onNavigate(ViewState.HOME)} className="w-full flex items-center space-x-2 text-slate-400 hover:text-white transition">
+              <ExternalLink className="w-4 h-4" /> <span>Back to Site</span>
+           </button>
+        </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {activeTab === 'DASHBOARD' && (
-           <div className="space-y-8 animate-fade-in">
-               {/* Stats Cards */}
-               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
-                       <div className="relative z-10">
-                           <p className="text-sm font-medium text-gray-500">Confirmed Revenue</p>
-                           <p className="text-3xl font-bold text-gray-900 mt-1">₹{totalRevenue.toLocaleString()}</p>
-                       </div>
-                       <div className="absolute right-4 top-4 bg-green-100 p-3 rounded-full">
-                           <TrendingUp className="w-6 h-6 text-green-600" />
-                       </div>
-                   </div>
-                   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
-                        <div className="relative z-10">
-                           <p className="text-sm font-medium text-gray-500">Total Bookings</p>
-                           <p className="text-3xl font-bold text-gray-900 mt-1">{bookings.length}</p>
-                        </div>
-                       <div className="absolute right-4 top-4 bg-blue-100 p-3 rounded-full">
-                           <CalendarIcon className="w-6 h-6 text-blue-600" />
-                       </div>
-                   </div>
-                   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
-                        <div className="relative z-10">
-                           <p className="text-sm font-medium text-gray-500">Confirmed</p>
-                           <p className="text-3xl font-bold text-gray-900 mt-1">{confirmedBookings}</p>
-                        </div>
-                       <div className="absolute right-4 top-4 bg-purple-100 p-3 rounded-full">
-                           <Users className="w-6 h-6 text-purple-600" />
-                       </div>
-                   </div>
-                   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
-                        <div className="relative z-10">
-                           <p className="text-sm font-medium text-gray-500">Pending Approval</p>
-                           <p className="text-3xl font-bold text-orange-600 mt-1">{pendingBookings}</p>
-                        </div>
-                       <div className="absolute right-4 top-4 bg-orange-100 p-3 rounded-full">
-                           <Lock className="w-6 h-6 text-orange-600" />
-                       </div>
-                   </div>
-               </div>
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto">
+        <header className="bg-white shadow-sm py-4 px-8 flex justify-between items-center sticky top-0 z-20">
+           <h2 className="text-xl font-bold text-gray-800 capitalize">{activeTab.replace('_', ' ').toLowerCase()}</h2>
+           <button onClick={refreshData} disabled={loading} className="p-2 rounded-full hover:bg-gray-100 text-gray-600 transition">
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+           </button>
+        </header>
 
-               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                   {/* Chart */}
-                   <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                       <h3 className="text-lg font-bold text-gray-900 mb-6">Revenue Trend (Last 7 Active Days)</h3>
-                       <div className="h-80 w-full">
-                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={getLast7DaysData()}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                                <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `₹${value}`} />
-                                <Tooltip cursor={{fill: '#f3f4f6'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                                <Bar dataKey="revenue" fill="#16a34a" radius={[4, 4, 0, 0]} barSize={40} />
-                            </BarChart>
-                         </ResponsiveContainer>
-                       </div>
-                   </div>
-
-                   {/* Quick AI Insight */}
-                   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-                       <div className="flex items-center justify-between mb-4">
-                           <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                               <Sparkles className="w-5 h-5 mr-2 text-purple-600" /> Business Insight
-                           </h3>
-                       </div>
-                       <div className="flex-1 bg-purple-50 rounded-lg p-4 border border-purple-100 text-sm text-gray-700 overflow-y-auto max-h-[250px] custom-scrollbar">
-                           {aiInsight ? (
-                               <div className="prose prose-sm max-w-none whitespace-pre-line">
-                                   {aiInsight}
-                               </div>
-                           ) : (
-                               <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
-                                   <BrainCircuit className="w-10 h-10 mb-2 opacity-50" />
-                                   <p>Tap below to analyze your turf's performance with AI.</p>
-                               </div>
-                           )}
-                       </div>
-                       <button 
-                           onClick={runAIAnalysis}
-                           disabled={generatingAI}
-                           className="mt-4 w-full bg-purple-600 text-white py-2 rounded-lg font-medium hover:bg-purple-700 transition flex items-center justify-center">
-                           {generatingAI ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
-                           {generatingAI ? 'Analyzing...' : 'Generate AI Report'}
-                       </button>
-                   </div>
-               </div>
-           </div>
-        )}
-
-        {activeTab === 'BOOKINGS' && (
-            <div className="space-y-4 animate-fade-in">
-                {/* Search & Filter Bar */}
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                    <div className="relative w-full sm:w-96">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <input 
-                            type="text" 
-                            placeholder="Search by Name or Phone..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                        />
+        <main className="p-8">
+            {activeTab === 'DASHBOARD' && (
+                <div className="space-y-8 animate-fade-in">
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center">
+                            <div className="p-4 rounded-xl bg-green-50 text-green-600 mr-4">
+                                <DollarSign className="w-8 h-8" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-500 font-medium">Total Revenue</p>
+                                <p className="text-2xl font-extrabold text-gray-900">₹{totalRevenue.toLocaleString()}</p>
+                            </div>
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center">
+                            <div className="p-4 rounded-xl bg-blue-50 text-blue-600 mr-4">
+                                <Check className="w-8 h-8" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-500 font-medium">Confirmed Bookings</p>
+                                <p className="text-2xl font-extrabold text-gray-900">{confirmedBookings}</p>
+                            </div>
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center">
+                            <div className="p-4 rounded-xl bg-yellow-50 text-yellow-600 mr-4">
+                                <Clock className="w-8 h-8" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-500 font-medium">Pending Requests</p>
+                                <p className="text-2xl font-extrabold text-gray-900">{pendingBookings}</p>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <div className="flex items-center space-x-2 w-full sm:w-auto">
-                        <div className="relative flex-1 sm:flex-none">
-                            <select 
-                                value={filterStatus}
-                                onChange={(e) => setFilterStatus(e.target.value)}
-                                className="w-full appearance-none pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none bg-white cursor-pointer"
-                            >
-                                <option value="ALL">All Status</option>
-                                <option value="PENDING">Pending</option>
-                                <option value="CONFIRMED">Confirmed</option>
-                                <option value="REJECTED">Rejected</option>
-                            </select>
-                            <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+
+                    {/* Chart */}
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                        <h3 className="text-lg font-bold text-gray-800 mb-6">Revenue Trend (Last 7 Days)</h3>
+                        <div className="h-80 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={getLast7DaysData()}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+                                    <Tooltip 
+                                        cursor={{fill: '#f3f4f6'}}
+                                        contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
+                                    />
+                                    <Bar dataKey="revenue" fill="#10b981" radius={[6, 6, 0, 0]} barSize={40} />
+                                </BarChart>
+                            </ResponsiveContainer>
                         </div>
-                        
-                        <button 
-                            onClick={handleExportCSV}
-                            className="flex items-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition shadow-sm">
-                            <Download className="w-4 h-4 mr-2" /> Export
-                        </button>
                     </div>
                 </div>
+            )}
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                        <h3 className="font-bold text-gray-700">Booking List ({filteredBookings.length})</h3>
-                        <div className="text-xs text-gray-500">Latest First</div>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left text-gray-500">
-                            <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
-                                <tr>
-                                    <th className="px-6 py-4">Date/Time</th>
-                                    <th className="px-6 py-4">Customer</th>
-                                    <th className="px-6 py-4">Payment Info</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {filteredBookings.length > 0 ? (
-                                    filteredBookings.map((booking, idx) => {
-                                        const isPending = booking.Status && String(booking.Status).toUpperCase() === 'PENDING';
-                                        
-                                        return (
-                                        <tr key={idx} className="bg-white hover:bg-gray-50 transition">
-                                            <td className="px-6 py-4">
-                                                <div className="font-medium text-gray-900 whitespace-nowrap">{booking.Date}</div>
-                                                <div className="text-xs text-gray-500 font-mono">{booking.Slot}</div>
-                                                <div className="text-[10px] text-gray-400 mt-1">{new Date(booking.Timestamp).toLocaleDateString()}</div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="font-medium text-gray-900">{booking.Name}</div>
-                                                <div className="text-xs text-gray-500">{booking.Phone}</div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="font-bold text-gray-900">₹{booking.Amount}</div>
-                                                {booking.PaymentId && <div className="text-xs text-gray-500 truncate max-w-[100px]" title={booking.PaymentId}>ID: {booking.PaymentId}</div>}
-                                                {booking.ScreenshotUrl && booking.ScreenshotUrl !== 'N/A' ? (
-                                                    <a href={booking.ScreenshotUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center mt-1">
-                                                        <Image className="w-3 h-3 mr-1" /> View Screen
-                                                    </a>
-                                                ) : (
-                                                    <span className="text-xs text-gray-400 italic">No image</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                                                    booking.Status === 'CONFIRMED' ? 'bg-green-100 text-green-800' : 
-                                                    isPending ? 'bg-yellow-100 text-yellow-800' :
-                                                    'bg-red-100 text-red-800'
-                                                }`}>
-                                                    {booking.Status}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                {actionLoading === booking.BookingId ? (
-                                                     <Loader2 className="w-5 h-5 animate-spin text-gray-400 ml-auto" />
-                                                ) : (
-                                                    <div className="flex justify-end space-x-2">
-                                                        {isPending && (
-                                                            <>
-                                                                <button 
-                                                                    onClick={() => handleApprove(booking.BookingId)} 
-                                                                    className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700 transition flex items-center shadow-sm"
-                                                                    title="Approve Booking">
-                                                                    <Check className="w-3 h-3 mr-1" /> Approve
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => handleReject(booking.BookingId)} 
-                                                                    className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-700 transition flex items-center shadow-sm"
-                                                                    title="Reject Booking">
-                                                                    <X className="w-3 h-3 mr-1" /> Reject
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                        {booking.Status === 'CONFIRMED' && (
-                                                            <button 
-                                                                onClick={() => handleReject(booking.BookingId)} 
-                                                                className="p-1.5 bg-gray-50 text-gray-500 rounded-lg hover:bg-red-50 hover:text-red-600 border border-gray-200 transition" 
-                                                                title="Cancel Booking">
-                                                                <Ban className="w-4 h-4" />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    )})
-                                ) : (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                                            No bookings found matching your filters.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'SETTINGS' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in">
-                {/* Site Configuration */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
-                        <Settings className="w-5 h-5 mr-2 text-gray-600" /> General Settings
-                    </h3>
-                    <div className="space-y-6">
-                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                                <CreditCard className="w-4 h-4 mr-2" /> UPI ID (for Payments)
-                            </label>
+            {activeTab === 'BOOKINGS' && (
+                <div className="space-y-6 animate-fade-in">
+                    <div className="flex flex-col md:flex-row gap-4 justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                             <input 
                                 type="text" 
-                                value={config.upiId}
-                                onChange={(e) => setConfig({...config, upiId: e.target.value})}
-                                className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-green-500 focus:border-green-500 outline-none"
-                                placeholder="merchant@upi"
+                                placeholder="Search by name, phone or ID..." 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-green-500 outline-none"
                             />
-                            <p className="text-xs text-gray-500 mt-1">This ID will be shown to users during booking.</p>
                         </div>
+                        <div className="flex items-center gap-2">
+                            <Filter className="w-5 h-5 text-gray-400" />
+                            <select 
+                                value={filterStatus} 
+                                onChange={(e) => setFilterStatus(e.target.value)}
+                                className="py-2.5 px-4 rounded-lg border border-gray-200 focus:ring-2 focus:ring-green-500 outline-none bg-white text-gray-700"
+                            >
+                                <option value="ALL">All Status</option>
+                                <option value="CONFIRMED">Confirmed</option>
+                                <option value="PENDING">Pending</option>
+                                <option value="CANCELLED">Cancelled</option>
+                                <option value="REJECTED">Rejected</option>
+                            </select>
+                            <button onClick={handleExportCSV} className="flex items-center px-4 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-black transition text-sm font-bold">
+                                <Download className="w-4 h-4 mr-2" /> Export
+                            </button>
+                        </div>
+                    </div>
 
-                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                                <Clock className="w-4 h-4 mr-2" /> Peak Hour Start (24h format)
-                            </label>
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50 border-b border-gray-200">
+                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">Date/Time</th>
+                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">Customer</th>
+                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">Amount</th>
+                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">Status</th>
+                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">Payment</th>
+                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {filteredBookings.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} className="p-8 text-center text-gray-400">No bookings found.</td>
+                                        </tr>
+                                    ) : (
+                                        filteredBookings.map((booking) => (
+                                            <tr key={booking.BookingId} className="hover:bg-gray-50 transition group">
+                                                <td className="p-4">
+                                                    <div className="font-bold text-gray-900">{booking.Date}</div>
+                                                    <div className="text-xs text-gray-500">{booking.Slot}</div>
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="font-medium text-gray-900">{booking.Name}</div>
+                                                    <div className="text-xs text-gray-500">{booking.Phone}</div>
+                                                </td>
+                                                <td className="p-4 font-mono font-medium">₹{booking.Amount}</td>
+                                                <td className="p-4">
+                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold
+                                                        ${booking.Status === 'CONFIRMED' ? 'bg-green-100 text-green-800' : 
+                                                          booking.Status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 
+                                                          booking.Status === 'REJECTED' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                        {booking.Status}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="text-xs text-gray-500">{booking.PaymentId}</div>
+                                                    {booking.ScreenshotUrl && booking.ScreenshotUrl !== 'N/A' && (
+                                                        <a href={booking.ScreenshotUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline flex items-center mt-1">
+                                                            <Image className="w-3 h-3 mr-1" /> View Screen
+                                                        </a>
+                                                    )}
+                                                </td>
+                                                <td className="p-4 text-right">
+                                                    {booking.Status === 'PENDING' && (
+                                                        <div className="flex justify-end gap-2">
+                                                            <button 
+                                                                onClick={() => handleApprove(booking.BookingId)} 
+                                                                disabled={!!actionLoading}
+                                                                className="p-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition"
+                                                                title="Approve"
+                                                            >
+                                                                {actionLoading === booking.BookingId ? <Loader2 className="w-4 h-4 animate-spin"/> : <Check className="w-4 h-4" />}
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleReject(booking.BookingId)} 
+                                                                disabled={!!actionLoading}
+                                                                className="p-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition"
+                                                                title="Reject"
+                                                            >
+                                                                {actionLoading === booking.BookingId ? <Loader2 className="w-4 h-4 animate-spin"/> : <X className="w-4 h-4" />}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'SETTINGS' && (
+                <div className="max-w-4xl space-y-8 animate-fade-in">
+                    {/* Pricing Config */}
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                        <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+                            <CreditCard className="w-5 h-5 mr-2 text-green-600" /> Pricing & Payments
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Base Price (Day)</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-3 text-gray-400">₹</span>
+                                    <input 
+                                        type="number" 
+                                        value={config.basePrice}
+                                        onChange={e => setConfig({...config, basePrice: Number(e.target.value)})}
+                                        className="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Peak Price (Night/Weekend)</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-3 text-gray-400">₹</span>
+                                    <input 
+                                        type="number" 
+                                        value={config.peakPrice}
+                                        onChange={e => setConfig({...config, peakPrice: Number(e.target.value)})}
+                                        className="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Peak Start Hour (24h)</label>
+                                <input 
+                                    type="number" 
+                                    value={config.peakStartHour}
+                                    onChange={e => setConfig({...config, peakStartHour: Number(e.target.value)})}
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
+                                />
+                            </div>
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">UPI ID (Merchant)</label>
+                                <input 
+                                    type="text" 
+                                    value={config.upiId}
+                                    onChange={e => setConfig({...config, upiId: e.target.value})}
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
+                                />
+                            </div>
+                        </div>
+                        <div className="mt-6 flex justify-end">
+                            <button onClick={handleSaveSettings} className="bg-green-600 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-green-700 transition flex items-center">
+                                <Save className="w-4 h-4 mr-2" /> Save Changes
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Block Slots */}
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                        <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+                            <Ban className="w-5 h-5 mr-2 text-red-500" /> Maintenance & Blocking
+                        </h3>
+                        <div className="flex items-center gap-4 mb-6">
                             <input 
-                                type="number" 
-                                value={config.peakStartHour}
-                                onChange={(e) => setConfig({...config, peakStartHour: Number(e.target.value)})}
-                                className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-green-500 focus:border-green-500 outline-none"
-                                min={0} max={23}
+                                type="date" 
+                                value={blockDate}
+                                onChange={e => setBlockDate(e.target.value)}
+                                className="px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
                             />
-                            <p className="text-xs text-gray-500 mt-1">Slots from this hour onwards will charge peak price.</p>
+                            <p className="text-sm text-gray-500">Select date to manage availability manually.</p>
                         </div>
-                    </div>
-                </div>
-
-                {/* Pricing Configuration */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
-                        <DollarSign className="w-5 h-5 mr-2 text-green-600" /> Pricing Rules
-                    </h3>
-                    <div className="space-y-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Base Price (Off-Peak)</label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-2.5 text-gray-500">₹</span>
-                                <input 
-                                    type="number" 
-                                    value={config.basePrice}
-                                    onChange={(e) => setConfig({...config, basePrice: Number(e.target.value)})}
-                                    className="w-full pl-8 border border-gray-300 rounded-lg p-2.5 focus:ring-green-500 focus:border-green-500 outline-none"
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Peak Price (Evening/Weekend)</label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-2.5 text-gray-500">₹</span>
-                                <input 
-                                    type="number" 
-                                    value={config.peakPrice}
-                                    onChange={(e) => setConfig({...config, peakPrice: Number(e.target.value)})}
-                                    className="w-full pl-8 border border-gray-300 rounded-lg p-2.5 focus:ring-green-500 focus:border-green-500 outline-none"
-                                />
-                            </div>
-                        </div>
-
-                        <button 
-                            onClick={handleSaveSettings}
-                            disabled={loading}
-                            className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition shadow-md mt-2 flex justify-center items-center">
-                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save All Settings'}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Block Slots */}
-                <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                        <Lock className="w-5 h-5 mr-2 text-red-500" /> Block Slots (Maintenance)
-                    </h3>
-                    
-                    <div className="mb-4">
-                        <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Select Date</label>
-                        <input 
-                            type="date" 
-                            value={blockDate}
-                            onChange={(e) => setBlockDate(e.target.value)}
-                            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-red-500 focus:border-red-500 outline-none max-w-xs"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
-                            {Array.from({length: 18}, (_, i) => i + 6).map(hour => {
-                                const slotId = `slot-${hour}`;
-                                const isBlocked = blockedSlots.some(b => b.Date === blockDate && b.SlotId === slotId);
-
-                                return (
-                                    <button
+                        
+                        <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
+                             {Array.from({length: 18}, (_, i) => i + 6).map(hour => {
+                                 const slotId = `slot-${hour}`;
+                                 const isBlocked = blockedSlots.some(b => b.Date === blockDate && b.SlotId === slotId);
+                                 return (
+                                     <button 
                                         key={slotId}
                                         onClick={() => handleToggleBlock(slotId)}
-                                        className={`text-xs py-2 px-1 rounded border transition-colors ${
-                                            isBlocked 
-                                            ? 'bg-red-600 text-white border-red-600 font-bold shadow-inner' 
-                                            : 'bg-white text-gray-700 hover:border-red-300 hover:bg-red-50'
-                                        }`}>
+                                        className={`py-2 px-1 rounded-lg text-xs font-bold border transition ${isBlocked ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-gray-200 text-gray-600 hover:border-green-500'}`}
+                                     >
                                         {hour}:00
-                                    </button>
-                                )
-                            })}
+                                        <div className="mt-1">{isBlocked ? 'BLOCKED' : 'OPEN'}</div>
+                                     </button>
+                                 )
+                             })}
+                        </div>
                     </div>
-                    <p className="text-xs text-gray-400 mt-4 text-center">
-                        Red slots are blocked for {blockDate}. Users cannot book them.
-                    </p>
                 </div>
-            </div>
-        )}
+            )}
 
-        {activeTab === 'AI_LAB' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
-                {/* Marketing Generator */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center justify-between mb-6">
-                         <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                            <Sparkles className="w-5 h-5 mr-2 text-purple-600" /> Marketing Assistant
-                        </h3>
-                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">Gemini 2.5 Flash</span>
-                    </div>
-                    
-                    <p className="text-sm text-gray-600 mb-6">
-                        Generate catchy social media posts (Instagram/WhatsApp) based on your recent booking data to boost engagement.
-                    </p>
-
-                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 min-h-[150px] mb-4 relative">
-                        {marketingCopy ? (
-                             <p className="text-gray-800 whitespace-pre-wrap text-sm">{marketingCopy}</p>
-                        ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
-                                AI generated content will appear here...
+            {activeTab === 'AI_LAB' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+                    {/* Insights Generator */}
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                        <div className="flex items-center mb-4">
+                            <div className="bg-purple-100 p-2 rounded-lg mr-3">
+                                <Sparkles className="w-6 h-6 text-purple-600" />
                             </div>
-                        )}
-                        {marketingCopy && (
-                            <button 
-                                onClick={() => navigator.clipboard.writeText(marketingCopy)}
-                                className="absolute top-2 right-2 p-1.5 bg-white rounded-md shadow hover:bg-gray-100 text-gray-500">
-                                <Copy className="w-4 h-4" />
-                            </button>
-                        )}
-                    </div>
-
-                    <button 
-                        onClick={runMarketingGen}
-                        disabled={generatingAI}
-                        className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold hover:bg-black transition flex justify-center items-center shadow-lg">
-                        {generatingAI ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Sparkles className="w-5 h-5 mr-2 text-yellow-400" />}
-                        Generate Post
-                    </button>
-                </div>
-
-                {/* Business Intelligence */}
-                <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl shadow-lg border border-transparent p-6 text-white">
-                    <h3 className="text-lg font-bold mb-4 flex items-center">
-                        <BrainCircuit className="w-5 h-5 mr-2" /> Deep Analysis
-                    </h3>
-                    <p className="text-indigo-100 text-sm mb-6">
-                        Our AI analyzes your booking patterns, revenue streams, and peak hours to provide actionable strategies for growth.
-                    </p>
-
-                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-5 border border-white/20 min-h-[200px] mb-6">
-                        {aiInsight ? (
-                            <div className="prose prose-invert prose-sm max-w-none">
+                            <h3 className="text-xl font-bold text-gray-900">Business Analyst</h3>
+                        </div>
+                        <p className="text-gray-500 mb-6 text-sm">
+                            Analyze booking trends and revenue data to get actionable advice on how to grow your business.
+                        </p>
+                        
+                        <button 
+                            onClick={runAIAnalysis}
+                            disabled={generatingAI}
+                            className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition shadow-lg shadow-purple-200 mb-6 flex justify-center items-center"
+                        >
+                            {generatingAI ? <Loader2 className="animate-spin w-5 h-5" /> : 'Generate Insights'}
+                        </button>
+                        
+                        {aiInsight && (
+                            <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 text-gray-800 text-sm leading-relaxed whitespace-pre-line">
                                 {aiInsight}
                             </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-indigo-200">
-                                <Sparkles className="w-8 h-8 mb-3 opacity-50" />
-                                <p className="text-sm">Ready to analyze {bookings.length} data points.</p>
-                            </div>
                         )}
                     </div>
 
-                    <button 
-                        onClick={runAIAnalysis}
-                        disabled={generatingAI}
-                        className="w-full bg-white text-indigo-700 py-3 rounded-lg font-bold hover:bg-indigo-50 transition shadow-lg">
-                        {generatingAI ? 'Analyzing Data...' : 'Run Full Business Audit'}
-                    </button>
-                </div>
-            </div>
-        )}
+                    {/* Copy Generator */}
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                         <div className="flex items-center mb-4">
+                            <div className="bg-pink-100 p-2 rounded-lg mr-3">
+                                <TrendingUp className="w-6 h-6 text-pink-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900">Marketing Assistant</h3>
+                        </div>
+                        <p className="text-gray-500 mb-6 text-sm">
+                            Generate catchy social media captions to fill your empty slots for the weekend.
+                        </p>
+                        
+                        <button 
+                            onClick={runMarketingGen}
+                            disabled={generatingAI}
+                            className="w-full py-3 bg-pink-600 text-white rounded-xl font-bold hover:bg-pink-700 transition shadow-lg shadow-pink-200 mb-6 flex justify-center items-center"
+                        >
+                             {generatingAI ? <Loader2 className="animate-spin w-5 h-5" /> : 'Write Post'}
+                        </button>
 
+                         {marketingCopy && (
+                            <div className="bg-pink-50 p-4 rounded-xl border border-pink-100 relative group">
+                                <p className="text-gray-800 text-sm whitespace-pre-line">{marketingCopy}</p>
+                                <button 
+                                    onClick={() => navigator.clipboard.writeText(marketingCopy)}
+                                    className="absolute top-2 right-2 p-1 bg-white rounded-md shadow-sm text-gray-400 hover:text-gray-900 opacity-0 group-hover:opacity-100 transition"
+                                >
+                                    <Copy className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </main>
       </div>
     </div>
   );
