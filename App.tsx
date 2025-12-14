@@ -4,7 +4,7 @@ import { Navigation } from './components/Navigation';
 import { BookingSystem } from './components/BookingSystem';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ViewState, User } from './types';
-import { MapPin, Phone, Mail, Star, Quote, ArrowRight, Instagram, Facebook, Twitter, Send, Check, ShieldCheck, Zap, Trophy, AlertTriangle } from 'lucide-react';
+import { MapPin, Phone, Mail, Star, Quote, ArrowRight, Check, ShieldCheck, Zap, Trophy, AlertTriangle } from 'lucide-react';
 import { getReviews, getCurrentUser, loginUser, logoutUser } from './services/storageService';
 import { GOOGLE_SCRIPT_URL } from './services/api';
 
