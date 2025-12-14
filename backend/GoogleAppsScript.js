@@ -1,12 +1,6 @@
 /* 
   PASTE THIS INTO GOOGLE APPS SCRIPT (Extensions > Apps Script)
   THEN DEPLOY AS WEB APP -> WHO HAS ACCESS: ANYONE
-  
-  IMPORTANT: 
-  1. Add columns to "Bookings" sheet if they don't exist:
-     Column J: PaymentId
-     Column K: ScreenshotUrl
-  2. This script will create a "TurfUploads" folder in your Google Drive automatically.
 */
 
 const SHEET_ID = ""; // Leave empty to use the sheet this script is bound to
@@ -26,7 +20,6 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  // Handle CORS for POST requests - Google Apps Script requires text/plain to avoid preflight
   try {
     const data = JSON.parse(e.postData.contents);
     const action = data.action;
@@ -49,42 +42,49 @@ function doPost(e) {
   }
 }
 
-// --- Logic ---
+// -------------------------------------------------------------------------
+// CORE LOGIC
+// -------------------------------------------------------------------------
 
 function getAvailability(date) {
   const bookingsSheet = getOrCreateSheet("Bookings");
   const blockedSheet = getOrCreateSheet("Blocked");
   const configSheet = getOrCreateSheet("Config");
 
-  // Get Bookings
+  // 1. Get Bookings
   const bRows = bookingsSheet.getDataRange().getValues();
   const bookedSlots = [];
   const now = new Date();
   
-  // Skip header, filter by date
-  // Data starts at row 1 (index 1) if header exists
+  // Iterate rows (skip header)
   for (let i = 1; i < bRows.length; i++) {
-    // Safety check for empty rows
-    if (!bRows[i][0]) continue;
+    if (!bRows[i][0]) continue; // Skip empty rows
 
-    const rowDate = bRows[i][1]; // Date column
-    const slotId = bRows[i][2];  // Slot column
-    // Safety: ensure cell value exists before string conversion
+    // CRITICAL FIX: Normalize Date to String for comparison
+    const rowDate = normalizeDate(bRows[i][1]); 
+    const slotId = bRows[i][2];
+    
+    // Safety check for status
     const statusRaw = bRows[i][7];
-    const status = (statusRaw || "").toString().toUpperCase(); 
-    const timestampStr = bRows[i][8]; // Timestamp column
+    const status = (statusRaw ? String(statusRaw) : "").toUpperCase();
+    
+    const timestampStr = bRows[i][8];
 
+    // Check if dates match (String vs String)
     if (rowDate === date) {
       if (status === 'CONFIRMED') {
         bookedSlots.push(slotId);
       } else if (status === 'PENDING') {
-        // SOFT LOCK LOGIC
+        // Soft Lock: Check if < 4 hours old
         let timestamp;
         try {
             timestamp = new Date(timestampStr);
-            if(isNaN(timestamp.getTime())) throw new Error("Invalid Date");
+            // If invalid date, treat as booked to be safe
+            if(isNaN(timestamp.getTime())) {
+                bookedSlots.push(slotId);
+                continue;
+            }
         } catch(e) {
-             // If date is unparsable, we block the slot to be safe
              bookedSlots.push(slotId);
              continue;
         }
@@ -97,16 +97,18 @@ function getAvailability(date) {
     }
   }
 
-  // Get Blocked
+  // 2. Get Blocked Slots
   const blRows = blockedSheet.getDataRange().getValues();
   const blockedSlots = [];
   for (let i = 1; i < blRows.length; i++) {
-    if (blRows[i][0] === date) {
+    // Normalize blocked date too
+    const blDate = normalizeDate(blRows[i][0]);
+    if (blDate === date) {
       blockedSlots.push(blRows[i][1]);
     }
   }
 
-  // Get Pricing & Config
+  // 3. Get Config
   const cRows = configSheet.getDataRange().getValues();
   const pricing = {};
   for(let i = 1; i < cRows.length; i++) {
@@ -122,30 +124,33 @@ function getAvailability(date) {
 
 function createBooking(data) {
   const lock = LockService.getScriptLock();
+  // Wait longer for lock to ensure no collisions
   try {
-    lock.waitLock(10000); 
+    lock.waitLock(15000); 
     
     const sheet = getOrCreateSheet("Bookings");
     const rows = sheet.getDataRange().getValues();
     const now = new Date();
     
-    // Double check availability
+    // 1. Double check availability
     for (let i = 1; i < rows.length; i++) {
       if(!rows[i][0]) continue;
 
-      const rowDate = rows[i][1];
+      const rowDate = normalizeDate(rows[i][1]);
       const slotId = rows[i][2];
-      // Safety check
+      
       const statusRaw = rows[i][7];
-      const status = (statusRaw || "").toString().toUpperCase();
+      const status = (statusRaw ? String(statusRaw) : "").toUpperCase();
       const timestampStr = rows[i][8];
 
+      // Compare using normalized date string
       if (rowDate === data.date && slotId === data.slotId) {
           if (status === 'CONFIRMED') {
             return response({status: 'error', message: 'Slot already booked'});
           }
           if (status === 'PENDING') {
              let timestamp = new Date(timestampStr);
+             // If timestamp invalid, assume locked
              if(isNaN(timestamp.getTime())) {
                  return response({status: 'error', message: 'Slot unavailable (System Check)'});
              }
@@ -157,20 +162,25 @@ function createBooking(data) {
       }
     }
 
+    // 2. Upload Image
     let screenshotUrl = 'N/A';
     if (data.image) {
-       screenshotUrl = uploadToDrive(data.image, data.name + "_" + data.date);
+       // Keep simple name to avoid special char issues
+       screenshotUrl = uploadToDrive(data.image, "Pay_" + data.slotId + "_" + Date.now());
     }
 
-    const id = Math.random().toString(36).substr(2, 9);
+    // 3. Append Booking
+    const id = Math.random().toString(36).substr(2, 9).toUpperCase();
     const timestampStr = now.toISOString();
     
+    // Explicitly force date as string with ' prefix if needed, but usually just passing string is enough.
+    // We add 'PENDING' explicitly.
     sheet.appendRow([
       id,
-      data.date,
+      data.date,   // This comes as "YYYY-MM-DD" string from frontend
       data.slotId,
       data.name,
-      data.phone,
+      "'"+data.phone, // Force phone as string to prevent scientific notation
       'N/A', 
       data.amount,
       'PENDING', 
@@ -194,8 +204,7 @@ function updateBookingStatus(bookingId, newStatus) {
    
    for (let i = 1; i < rows.length; i++) {
      if (rows[i][0] == bookingId) { 
-       // Status is in column 8 (Index 7, but allow for offset if header changed)
-       // Fixed: Column H is index 8 (1-based) in getRange
+       // Column H is index 8 (1-based)
        sheet.getRange(i + 1, 8).setValue(newStatus); 
        return response({status: 'success'});
      }
@@ -208,17 +217,17 @@ function getAllData() {
   const blSheet = getOrCreateSheet("Blocked");
   const cSheet = getOrCreateSheet("Config");
   
-  const bookings = sheetToJson(bSheet);
-  const blocked = sheetToJson(blSheet);
+  // Use custom sheetToJson that normalizes dates
+  const bookings = sheetToJson(bSheet, true);
+  const blocked = sheetToJson(blSheet, true);
   
-  // Sort bookings
+  // Sort bookings desc
   bookings.sort((a, b) => {
       const dateA = new Date(a.Timestamp);
       const dateB = new Date(b.Timestamp);
       return isNaN(dateA) || isNaN(dateB) ? 0 : dateB - dateA;
   });
 
-  // Get Config
   const cRows = cSheet.getDataRange().getValues();
   const config = {};
   for(let i = 1; i < cRows.length; i++) {
@@ -233,7 +242,9 @@ function toggleBlock(data) {
   const rows = sheet.getDataRange().getValues();
   
   for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0] === data.date && rows[i][1] === data.slotId) {
+    // Normalize date for comparison
+    const rDate = normalizeDate(rows[i][0]);
+    if (rDate === data.date && rows[i][1] === data.slotId) {
       sheet.deleteRow(i + 1);
       return response({status: 'success', action: 'unblocked'});
     }
@@ -261,7 +272,31 @@ function updatePrice(data) {
   return response({status: 'success'});
 }
 
-// --- Helpers ---
+// -------------------------------------------------------------------------
+// HELPERS
+// -------------------------------------------------------------------------
+
+/**
+ * Normalizes any date input (String or Date Object) to "YYYY-MM-DD" string.
+ * This is crucial for matching dates between Frontend and Sheet.
+ */
+function normalizeDate(val) {
+  if (!val) return "";
+  
+  // If it's a Date object (Sheet often returns this)
+  if (Object.prototype.toString.call(val) === '[object Date]') {
+     const y = val.getFullYear();
+     // getMonth is 0-indexed
+     const m = ('0' + (val.getMonth() + 1)).slice(-2);
+     const d = ('0' + val.getDate()).slice(-2);
+     return y + '-' + m + '-' + d;
+  }
+  
+  // If string, handle potential ISO format (2023-01-01T00:00...)
+  const str = String(val);
+  if (str.includes('T')) return str.split('T')[0];
+  return str;
+}
 
 function getOrCreateSheet(name) {
   let sheet = SS.getSheetByName(name);
@@ -285,10 +320,18 @@ function uploadToDrive(base64Data, fileName) {
       folder = DriveApp.createFolder(UPLOAD_FOLDER_NAME);
     }
     
-    const split = base64Data.split(',');
-    const type = split[0].split(';')[0].replace('data:', '');
-    const data = Utilities.base64Decode(split[1]);
-    const blob = Utilities.newBlob(data, type, fileName);
+    // Handle typical base64 strings with or without prefix
+    const parts = base64Data.split(',');
+    const dataPart = parts.length > 1 ? parts[1] : parts[0];
+    // Default to jpeg if mimetype not found
+    let mimeType = 'image/jpeg';
+    if(parts.length > 1) {
+       const matches = parts[0].match(/:(.*?);/);
+       if(matches && matches.length > 1) mimeType = matches[1];
+    }
+
+    const data = Utilities.base64Decode(dataPart);
+    const blob = Utilities.newBlob(data, mimeType, fileName);
     
     const file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE, DriveApp.Permission.VIEW);
@@ -299,15 +342,22 @@ function uploadToDrive(base64Data, fileName) {
   }
 }
 
-function sheetToJson(sheet) {
+function sheetToJson(sheet, normalizeDates = false) {
   const data = sheet.getDataRange().getValues();
+  if (data.length === 0) return [];
+  
   const headers = data[0];
   const result = [];
   
   for (let i = 1; i < data.length; i++) {
     let row = {};
     for (let j = 0; j < headers.length; j++) {
-      row[headers[j]] = data[i][j];
+      let val = data[i][j];
+      // Normalize Date columns if requested
+      if (normalizeDates && (headers[j] === 'Date' || headers[j] === 'date')) {
+         val = normalizeDate(val);
+      }
+      row[headers[j]] = val;
     }
     result.push(row);
   }
